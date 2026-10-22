@@ -1,5 +1,7 @@
 class BankAccount:                                  
-    def __init__(self,account_num, owner, balance=0, pin=-1-1-1-1):
+    def __init__(self, account_num, owner, balance=0, pin=None):
+        if pin is None:
+            raise ValueError("PIN is required")
         self.__account_num=account_num
         self.owner = owner
         self.__balance = balance
@@ -18,7 +20,17 @@ class BankAccount:
             raise Exception ( " Limit cant be negative")
         self.__dailylimit=value
     
+    @property
+    def is_locked(self):
+        return self.__pincounter >= 3
 
+    def __check_pin(self, pin):              # private helper — DRY pin logic
+        if self.is_locked:
+            raise Exception("Account locked")
+        if pin != self.__pin:
+            self.__pincounter += 1
+            raise Exception("Wrong PIN")
+        self.__pincounter = 0               # reset immediately on correct PIN
 
     @property
     def account_no(self):
@@ -44,36 +56,21 @@ class BankAccount:
         else:
             raise Exception("Incorrect amount")      # capital E in Exception
 
-    def withdraw(self, amount , pin):
-        if self.__pincounter>3:
-            raise Exception("too many attempts")
-        elif pin!=self.__pin:
-            self.__pincounter+=1
-            raise Exception("incorrect pin")
-        
-        if pin == self.__pin:
-            if amount<=self.dailylimit:
-                self.__pincounter=0
-                if amount <= self.__balance and amount > 0:    # self.balance, not just balance
-                    self.__balance -= amount
-                    self.__history.append(f"withdraw {amount}")
-                else:
-                    raise Exception("Can't withdraw")
-            else:
-                raise Exception ("Crossed your daily Limit")
-          
+    def withdraw(self, amount, pin):
+        self.__check_pin(pin)
+        if amount > self.dailylimit:
+            raise Exception("Crossed your daily limit")
+        if amount <= 0 or amount > self.__balance:
+            raise Exception("Can't withdraw")
+        self.__balance -= amount
+        self.__history.append(f"withdraw {amount}")
 
-    def transfer(self, other, amount , pin):
-        if self.__pincounter>3:
-            raise Exception("too many attempts")
-        elif pin!=self.__pin:
-            self.__pincounter+=1
-            raise Exception("incorrect pin")
-        
-        if pin == self.__pin:
-            self.withdraw(amount,pin)                        # raises an error if it fails, so the next line is skipped
-            other.deposit(amount)
-            self.__history.append(f"Transfered {amount} to {other.owner}")
+
+    def transfer(self, other, amount, pin):
+        self.withdraw(amount, pin)           # withdraw already checks everything
+        other.deposit(amount)
+        self.__history.append(f"Transferred {amount} to {other.owner}")
+
       
 
     @property

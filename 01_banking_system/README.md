@@ -115,16 +115,13 @@ def account_no(self):
 Sensitive operations (`withdraw`, `transfer`) require a PIN. Wrong attempts are tracked privately. After 3 failures the account locks.
 
 ```python
-def withdraw(self, amount, pin):
-    if self.__pincounter >= 3:
-        raise Exception("too many attempts")   # locked out
-    elif pin != self.__pin:
+def __check_pin(self, pin):              # private helper
+    if self.is_locked:
+        raise Exception("Account locked")
+    if pin != self.__pin:
         self.__pincounter += 1
-        raise Exception("incorrect pin")
-
-    if pin == self.__pin:
-        self.__pincounter = 0   # reset on success
-        # ... balance check
+        raise Exception("Wrong PIN")
+    self.__pincounter = 0               # reset immediately on correct PIN
 ```
 
 > `__pin` is fully private — `a.pin` raises `AttributeError`. That's intentional: the PIN should never be readable from outside.
@@ -141,10 +138,51 @@ def dailylimit(self, value):
     self.__dailylimit = value
 
 # Inside withdraw — checked AFTER pin validation:
-if amount <= self.dailylimit:
-    # proceed
-else:
-    raise Exception("Crossed your daily Limit")
+if amount > self.dailylimit:
+    raise Exception("Crossed your daily limit")
+```
+
+### 8. `pin=None` default closes a security hole ✅
+
+With `pin=-4` as the default, `BankAccount(101, "ali", 500)` silently created an account where `withdraw(50, -4)` would succeed. Changing the default to `None` and rejecting it at construction forces every account to have an explicit PIN.
+
+```python
+def __init__(self, account_num, owner, balance=0, pin=None):
+    if pin is None:
+        raise ValueError("PIN is required")   # can't forget the PIN
+```
+
+### 9. DRY — extract duplicate logic into a private helper ✅
+
+`withdraw` and `transfer` both had identical lock-check + wrong-PIN + counter logic. That's a violation of DRY (Don't Repeat Yourself). Moving it into `__check_pin` means fixing a PIN bug in one place fixes it everywhere.
+
+```python
+# Before: ~10 lines duplicated in both methods
+# After: each method calls one line
+def withdraw(self, amount, pin):
+    self.__check_pin(pin)      # all PIN logic lives here
+    ...
+
+def transfer(self, other, amount, pin):
+    self.withdraw(amount, pin) # withdraw already checks everything
+    ...
+```
+
+### 10. Counter reset was happening too late ✅
+
+In the old code, `self.__pincounter = 0` was nested inside the daily-limit check. A correct PIN + over-limit amount never cleared the counter, meaning repeated over-limit attempts would eventually lock the account even though the PIN was always right. Moving the reset into `__check_pin` (right after PIN verification) fixes this.
+
+```python
+# ❌ OLD — reset inside nested if, never reached on limit error
+if pin == self.__pin:
+    if amount <= self.dailylimit:
+        self.__pincounter = 0     # skipped if amount > limit!
+        ...
+
+# ✅ NEW — reset happens immediately after the PIN is verified
+def __check_pin(self, pin):
+    ...
+    self.__pincounter = 0         # always cleared on correct PIN
 ```
 
 ---
@@ -165,8 +203,8 @@ Owner name cannot be empty
 ['deposit 100']
 610
 101
-incorrect pin
+Wrong PIN
 'BankAccount' object has no attribute 'pin'
-incorrect pin
+Wrong PIN
  Limit cant be negative
 ```
