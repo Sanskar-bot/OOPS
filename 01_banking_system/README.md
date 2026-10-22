@@ -8,11 +8,12 @@ A simple **Banking System** built from scratch using Python OOP to practice core
 
 | Concept | Where It Appears |
 |---|---|
-| **Encapsulation** | `__balance` and `__history` are private; exposed only via properties |
-| **Properties (`@property`)** | `balance`, `owner`, `history` — controlled read access |
+| **Encapsulation** | `__balance`, `__history`, `__account_num` are private; exposed only via properties |
+| **Properties (`@property`)** | `balance`, `owner`, `history`, `account_no` — controlled read access |
 | **Setters (`@setter`)** | `owner` setter validates the name before allowing assignment |
 | **Data validation** | Empty owner → `ValueError`; bad amounts → `Exception` |
 | **Immutable-style access** | `history` returns a copy so callers can't mutate the internal list |
+| **Private ID field** | `__account_num` stored privately; `account_no` property exposes it read-only |
 
 ---
 
@@ -20,10 +21,11 @@ A simple **Banking System** built from scratch using Python OOP to practice core
 
 ```python
 class BankAccount:
-    def __init__(self, owner, balance=0):
-        self.owner = owner          # goes through the setter (validates!)
-        self.__balance = balance    # private
-        self.__history = []         # private transaction log
+    def __init__(self, account_num, owner, balance=0):
+        self.__account_num = account_num  # private — must use __ or property breaks
+        self.owner = owner                # goes through the setter (validates!)
+        self.__balance = balance          # private
+        self.__history = []               # private transaction log
 ```
 
 ### Key Methods
@@ -42,6 +44,7 @@ class BankAccount:
 | `balance` | ❌ Read-only | Protects against direct mutation |
 | `owner` | ✅ Validated | Rejects empty / whitespace-only strings |
 | `history` | ❌ Read-only | Returns a **copy** — mutations on the copy don't affect the real log |
+| `account_no` | ❌ Read-only | Exposes the private `__account_num`; account number never changes |
 
 ---
 
@@ -79,6 +82,28 @@ def history(self):
     return list(self.__history)  # caller gets a copy, not a reference
 ```
 
+### 5. Private ID with read-only property — and the name-mangling gotcha ✅
+
+When you expose an ID via a `@property`, the backing store **must be private** (`__account_num`), not public (`account_num`). If they don't match, the property silently reads a non-existent mangled name and raises `AttributeError` at runtime.
+
+```python
+# ❌ WRONG — property returns self.__account_num but __init__ stores self.account_num
+def __init__(self, account_num, ...):
+    self.account_num = account_num   # stored as .account_num (public)
+
+@property
+def account_no(self):
+    return self.__account_num        # looks for ._BankAccount__account_num → AttributeError!
+
+# ✅ CORRECT — both sides use the private name
+def __init__(self, account_num, ...):
+    self.__account_num = account_num  # stored as ._BankAccount__account_num
+
+@property
+def account_no(self):
+    return self.__account_num         # finds it correctly → returns the value
+```
+
 ---
 
 ## ▶️ Run
@@ -96,4 +121,5 @@ property 'balance' of 'BankAccount' object has no setter
 Owner name cannot be empty
 ['deposit 100']
 610
+101
 ```

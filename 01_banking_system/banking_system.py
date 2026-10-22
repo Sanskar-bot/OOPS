@@ -1,8 +1,13 @@
 class BankAccount:                                  
-    def __init__(self, owner, balance=0):
+    def __init__(self,account_num, owner, balance=0):
+        self.__account_num=account_num
         self.owner = owner
         self.__balance = balance
         self.__history=[]
+    
+    @property
+    def account_no(self):
+        return self.__account_num
 
     @property
     def owner(self):
@@ -53,7 +58,7 @@ class BankAccount:
         return list(self.__history)       # a copy, so the real list stays safe
 
 
-a = BankAccount("ali", 500)
+a = BankAccount(101 , "ali", 500)
 print(a.balance)               # 500
 a.owner = "ali khan"           # accepted
 print(a.owner)                 # ali khan
@@ -69,7 +74,7 @@ except AttributeError as e:
     print(e)                   # property 'balance' of 'BankAccount' object has no setter
 
 try:
-    BankAccount("", 100)
+    BankAccount(0, "", 100)
 except ValueError as e:
     print(e)                   # Owner name cannot be empty
 
@@ -78,3 +83,4 @@ h = a.history
 h.append("fake")
 print(a.history)               # ['deposit 100'], the fake line is not there
 print(a.balance + 10)          # 610, works because balance is a number    # error, the setter works at creation
+print(a.account_no)           # 101, the account number
